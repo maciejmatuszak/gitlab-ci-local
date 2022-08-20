@@ -33,9 +33,10 @@ export class ParserIncludes {
         // Find files to fetch from remote and place in .gitlab-ci-local/includes
         for (const value of include) {
             if (value["local"]) {
-                const files = await globby(value["local"], {dot: true, cwd});
+                const path = this.stripSlashPrefix(value["local"])
+                const files = await globby(path, {dot: true, cwd});
                 if (files.length == 0) {
-                    throw new ExitError(`Local include file cannot be found ${value["local"]}`);
+                    throw new ExitError(`Local include file cannot be found ${path}`);
                 }
             } else if (value["file"]) {
                 for (const fileValue of Array.isArray(value["file"]) ? value["file"] : [value["file"]]) {
@@ -55,7 +56,7 @@ export class ParserIncludes {
 
         for (const value of include) {
             if (value["local"]) {
-                const files = await globby([value["local"], ...excludedGlobs], {dot: true, cwd});
+                const files = await globby([this.stripSlashPrefix(value["local"]), ...excludedGlobs], {dot: true, cwd});
                 for (const localFile of files) {
                     const content = await Parser.loadYaml(`${cwd}/${localFile}`);
                     excludedGlobs.push(`!${localFile}`);
@@ -94,6 +95,10 @@ export class ParserIncludes {
 
         includeDatas.push(gitlabData);
         return includeDatas;
+    }
+
+    static stripSlashPrefix(text: String) {
+        return text.replace('/', '')
     }
 
     static expandInclude (i: any): any[] {
