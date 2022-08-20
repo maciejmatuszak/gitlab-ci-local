@@ -33,7 +33,7 @@ export class ParserIncludes {
         // Find files to fetch from remote and place in .gitlab-ci-local/includes
         for (const value of include) {
             if (value["local"]) {
-                const path = this.stripSlashPrefix(value["local"])
+                const path = this.stripSlashPrefix(value["local"]);
                 const files = await globby(path, {dot: true, cwd});
                 if (files.length == 0) {
                     throw new ExitError(`Local include file cannot be found ${path}`);
@@ -97,8 +97,8 @@ export class ParserIncludes {
         return includeDatas;
     }
 
-    static stripSlashPrefix(text: String) {
-        return text.replace('/', '')
+    static stripSlashPrefix (text: string) {
+        return text.replace("/", "");
     }
 
     static expandInclude (i: any): any[] {
