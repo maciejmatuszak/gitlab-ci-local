@@ -9,4 +9,8 @@ alpine-image:
   script:
     - printenv
     - ls -all /certs/client
-    - docker build .
+    - docker build --tag dind-test .
+    - docker run --name ${CI_JOB_ID} --volume ${CI_PROJECT_DIR}/:/data/ --interactive -t -d dind-test 1> /dev/null
+    - docker exec ${CI_JOB_ID} cat /data/catme.txt
+  after_script:
+    - docker rm -f ${CI_JOB_ID} 1> /dev/null || true

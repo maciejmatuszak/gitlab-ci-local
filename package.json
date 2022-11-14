@@ -18,7 +18,7 @@
     "lint": "npx eslint .",
     "test": "npm run build && jest --testTimeout 30000",
     "coverage": "jest --coverage --testTimeout 30000",
-    "start": "ts-node --log-error src/index.ts --cwd examples/docker-compose-nodejs"
+    "start": "ts-node --log-error src/index.ts --cwd examples/docker-in-docker-build"
   },
   "dependencies": {
     "axios": "0.27.2",
