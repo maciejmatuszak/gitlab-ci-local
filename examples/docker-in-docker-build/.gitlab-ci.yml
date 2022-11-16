@@ -9,8 +9,20 @@ alpine-image:
   script:
     - printenv
     - ls -all /certs/client
+    - echo "content created in CI" > ./created.txt
+    - cat ./created.txt
     - docker build --tag dind-test .
-    - docker run --name ${CI_JOB_ID} --volume ${CI_PROJECT_DIR}/:/data/ --interactive -t -d dind-test 1> /dev/null
+    - >
+      docker run
+      --name ${CI_JOB_ID}
+      --volume ${CI_PROJECT_DIR}/:/data/
+      --interactive
+      --tty
+      --detach
+      dind-test
+      1> /dev/null
     - docker exec ${CI_JOB_ID} cat /data/catme.txt
+    - docker exec ${CI_JOB_ID} cat /data/created.txt
+
   after_script:
     - docker rm -f ${CI_JOB_ID} 1> /dev/null || true

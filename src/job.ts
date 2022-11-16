@@ -211,6 +211,11 @@ export class Job {
         return `gcl-${this.safeJobName}-${this.jobId}-tmp`;
     }
 
+    get varLibDockerVolumeName (): string {
+        return `gcl-${this.safeJobName}-${this.jobId}-var_lib_docker`;
+    }
+
+
     get imageName (): string | null {
         const image = this.jobData["image"];
         if (!image) {
@@ -340,15 +345,12 @@ export class Job {
         }
 
         if (this.imageName) {
-            const buildVolumeName = this.buildVolumeName;
-            const tmpVolumeName = this.tmpVolumeName;
-            const volumePromises = [];
-            volumePromises.push(Utils.spawn(["docker", "volume", "create", `${buildVolumeName}`], argv.cwd));
-            volumePromises.push(Utils.spawn(["docker", "volume", "create", `${tmpVolumeName}`], argv.cwd));
-            this._containerVolumeNames.push(buildVolumeName);
-            this._containerVolumeNames.push(tmpVolumeName);
-            await Promise.all(volumePromises);
+            await Promise.all([
+                this.getOrCreateVolume(this.buildVolumeName),
+                this.getOrCreateVolume(this.tmpVolumeName),
+            ]);
         }
+
 
         if (this.services?.length) {
             await this.createDockerNetwork(`gitlab-ci-local-${this.jobId}`);
@@ -952,6 +954,25 @@ export class Job {
             dockerCmd += `--network-alias=${alias} `;
         }
 
+
+        if (serviceName.includes("dind")) {
+            const buildVolumeName = this.buildVolumeName;
+            const tmpVolumeName = this.tmpVolumeName;
+            const varLibDockerVolumeName = this.varLibDockerVolumeName;
+
+            const promisses = [
+                this.getOrCreateVolume(buildVolumeName),
+                this.getOrCreateVolume(tmpVolumeName),
+                this.getOrCreateVolume(varLibDockerVolumeName),
+            ];
+
+            dockerCmd += `--volume ${buildVolumeName}:/gcl-builds `;
+            dockerCmd += `--volume ${tmpVolumeName}:/tmp/ `;
+            dockerCmd += `--volume=${varLibDockerVolumeName}:/var/lib/docker `;
+
+            await Promise.all(promisses);
+        }
+
         for (const key of Object.keys(this.expandedVariables)) {
             dockerCmd += `-e ${key} `;
         }
@@ -969,7 +990,6 @@ export class Job {
                 dockerCmd += "--entrypoint '/gcl-entry' ";
             }
         }
-        dockerCmd += `--volume ${this.tmpVolumeName}:/tmp/ `;
         dockerCmd += `${serviceName} `;
 
         (service.getCommand() ?? []).forEach((e) => dockerCmd += `"${e}" `);
@@ -977,7 +997,6 @@ export class Job {
         const time = process.hrtime();
 
         const {stdout: containerId} = await Utils.bash(dockerCmd, cwd, this.expandedVariables);
-        await Utils.spawn(["docker", "cp", `${stateDir}/builds/.docker/.` , `${containerId}:/gcl-builds`], cwd);
         this._containersToClean.push(containerId);
 
         // Copy docker entrypoint if specified for service
@@ -1033,4 +1052,16 @@ export class Job {
         const endTime = process.hrtime(time);
         writeStreams.stdout(chalk`${this.chalkJobName} {greenBright service image: ${serviceName} healthcheck passed in {green ${prettyHrtime(endTime)}}}\n`);
     }
+
+    async getOrCreateVolume (volumeName:string): Promise<void> {
+        if(this._containerVolumeNames.includes(volumeName)) {
+            return;
+        }
+        this._containerVolumeNames.push(volumeName);
+        return new Promise<void>((resolve) => {
+            Utils.spawn(["docker", "volume", "create", `${volumeName}`], this.argv.cwd)
+                .then(() => {resolve();});
+        });
+    }
+
 }
